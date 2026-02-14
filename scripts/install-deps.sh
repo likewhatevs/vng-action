@@ -10,7 +10,7 @@ PACKAGES=(
 )
 
 if dpkg -s "${PACKAGES[@]}" &>/dev/null && command -v vng &>/dev/null; then
-    echo "::notice::Dependencies already installed, skipping"
+    echo "Dependencies already installed, skipping"
     exit 0
 fi
 
@@ -25,10 +25,10 @@ if [ -e /dev/kvm ] && [ ! -f /etc/udev/rules.d/99-kvm4all.rules ]; then
         | sudo tee /etc/udev/rules.d/99-kvm4all.rules
     sudo udevadm control --reload-rules
     sudo udevadm trigger --name-match=kvm
-    echo "::notice::KVM access configured (/dev/kvm mode 0666)"
+    echo "KVM access configured (/dev/kvm mode 0666)"
     echo "::endgroup::"
 elif [ ! -e /dev/kvm ]; then
     echo "::warning::/dev/kvm not found. VM will use software emulation (slow)."
 fi
 
-echo "::notice::Installed virtme-ng $(vng --version)"
+echo "Installed virtme-ng $(vng --version)"

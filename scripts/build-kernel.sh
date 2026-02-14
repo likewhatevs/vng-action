@@ -27,7 +27,7 @@ if [ -n "${VNG_KCONFIG:-}" ]; then
         echo "::error::kconfig file not found: '$VNG_KCONFIG' (resolved to '$KCONFIG_PATH'). Ensure the path is relative to your repository root."
         exit 1
     fi
-    echo "::notice::Using kconfig fragment: $VNG_KCONFIG"
+    echo "Using kconfig fragment: $VNG_KCONFIG"
     BUILD_ARGS+=(--config "$KCONFIG_PATH")
 fi
 
@@ -56,4 +56,4 @@ rm -rf "$KERNEL_DIR"
 mv "$CLEAN_DIR" "$KERNEL_DIR"
 echo "::endgroup::"
 
-echo "::notice::Kernel build complete"
+echo "Kernel build complete"

@@ -96,7 +96,7 @@ runs:
         if [ -f "$SHA_FILE" ]; then
           SHA=$(cat "$SHA_FILE")
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-          echo "::notice::Using cached kernel SHA from prior job: $SHA"
+          echo "Using cached kernel SHA from prior job: $SHA"
           exit 0
         fi
 
@@ -119,7 +119,7 @@ runs:
         echo -n "$SHA" > "$SHA_FILE"
 
         echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-        echo "::notice::Resolved ${{ inputs.kernel-tag }} -> $SHA"
+        echo "Resolved ${{ inputs.kernel-tag }} -> $SHA"
 
     - name: Save kernel SHA for subsequent jobs
       if: steps.sha-cache-restore.outputs.cache-hit != 'true'

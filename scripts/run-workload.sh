@@ -19,8 +19,10 @@ if [ -n "${VNG_NETWORK:-}" ]; then
     VNG_ARGS+=(--network "$VNG_NETWORK")
 fi
 
-echo "::group::Running workload in virtme-ng VM"
 cd "$KERNEL_DIR"
-vng "${VNG_ARGS[@]}" -- bash -c "set -euo pipefail
+echo "::group::Booting vng VM"
+vng "${VNG_ARGS[@]}" -- bash -c "echo '::endgroup::'
+echo '::group::Starting workload in vng VM'
+echo '::endgroup::'
+set -euo pipefail
 $VNG_COMMANDS"
-echo "::endgroup::"
