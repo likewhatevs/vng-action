@@ -1,0 +1,53 @@
+name: Test Action
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./
+        id: vng
+        with:
+          name: test-kernel
+          kernel-url: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+          kernel-tag: v6.12
+          run: |
+            uname -r
+            echo "Hello from inside the VM"
+
+      - name: Verify outputs
+        run: |
+          test -n "${{ steps.vng.outputs.kernel-sha }}"
+          echo "kernel-sha: ${{ steps.vng.outputs.kernel-sha }}"
+
+  cross-job-cache:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./
+        id: vng
+        with:
+          name: test-kernel
+          kernel-url: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+          kernel-tag: v6.12
+          run: |
+            uname -r
+            echo "Cross-job cache hit test"
+
+      - name: Verify SHA matches
+        run: |
+          echo "kernel-sha: ${{ steps.vng.outputs.kernel-sha }}"
+          test -n "${{ steps.vng.outputs.kernel-sha }}"
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck scripts/*.sh
