@@ -20,6 +20,9 @@ echo "::endgroup::"
 
 cd "$KERNEL_DIR"
 
+SHA=$(git rev-parse --short=12 HEAD)
+export LOCALVERSION="__${VNG_KERNEL_NAME:-local}__${SHA}"
+
 BUILD_ARGS=(--build --force)
 if [ -n "${VNG_KCONFIG:-}" ]; then
     KCONFIG_PATH="$GITHUB_WORKSPACE/$VNG_KCONFIG"

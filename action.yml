@@ -142,6 +142,7 @@ runs:
       env:
         VNG_KERNEL_URL: ${{ inputs.kernel-url }}
         VNG_KERNEL_TAG: ${{ inputs.kernel-tag }}
+        VNG_KERNEL_NAME: ${{ inputs.name }}
         VNG_KCONFIG: ${{ inputs.kconfig }}
         VNG_KERNEL_DIR: ${{ github.workspace }}/linux
 
