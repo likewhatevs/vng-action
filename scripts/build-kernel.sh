@@ -52,7 +52,11 @@ if [ "${VNG_CCACHE:-}" = "true" ] && command -v ccache &>/dev/null; then
     else
         _CC="gcc"
     fi
-    MAKE_VARS+=(CC="ccache $_CC" HOSTCC="ccache $_CC")
+    # Wrapper script avoids spaces in CC value (vng/make can't handle CC="ccache gcc")
+    CCACHE_WRAPPER=$(mktemp /tmp/ccache-cc-XXXXXX)
+    printf '#!/bin/sh\nexec ccache %s "$@"\n' "$_CC" > "$CCACHE_WRAPPER"
+    chmod +x "$CCACHE_WRAPPER"
+    MAKE_VARS+=(CC="$CCACHE_WRAPPER" HOSTCC="$CCACHE_WRAPPER")
 fi
 if [ -n "${VNG_KCONFIG:-}" ]; then
     KCONFIG_PATH="$GITHUB_WORKSPACE/$VNG_KCONFIG"
