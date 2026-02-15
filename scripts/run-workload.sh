@@ -19,6 +19,19 @@ if [ -n "${VNG_NETWORK:-}" ]; then
     VNG_ARGS+=(--network "$VNG_NETWORK")
 fi
 
+# Mount GitHub Actions file command directories so workloads can write to
+# $GITHUB_STEP_SUMMARY, $GITHUB_OUTPUT, $GITHUB_ENV, $GITHUB_PATH from the VM.
+declare -A _rwdirs
+for var in GITHUB_STEP_SUMMARY GITHUB_OUTPUT GITHUB_ENV GITHUB_PATH; do
+    if [ -n "${!var:-}" ]; then
+        dir=$(dirname "${!var}")
+        if [ -d "$dir" ] && [ -z "${_rwdirs[$dir]:-}" ]; then
+            VNG_ARGS+=(--rwdir "$dir")
+            _rwdirs[$dir]=1
+        fi
+    fi
+done
+
 cd "$KERNEL_DIR"
 echo "::group::Booting vng VM"
 vng "${VNG_ARGS[@]}" -- bash -c "echo '::endgroup::'
