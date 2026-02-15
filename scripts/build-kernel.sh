@@ -24,6 +24,36 @@ SHA=$(git rev-parse --short=12 HEAD)
 export LOCALVERSION="__${VNG_KERNEL_NAME:-local}__${SHA}"
 
 BUILD_ARGS=(--build --force)
+MAKE_VARS=()
+if [ -n "${VNG_LLVM:-}" ]; then
+    MAKE_VARS+=(LLVM="$VNG_LLVM")
+fi
+if [ -n "${VNG_CC:-}" ]; then
+    MAKE_VARS+=(CC="$VNG_CC" HOSTCC="$VNG_CC")
+fi
+if [ -n "${VNG_ARCH:-}" ]; then
+    MAKE_VARS+=(ARCH="$VNG_ARCH")
+fi
+if [ -n "${VNG_CROSS_COMPILE:-}" ]; then
+    MAKE_VARS+=(CROSS_COMPILE="$VNG_CROSS_COMPILE")
+fi
+if [ "${VNG_CCACHE:-}" = "true" ] && command -v ccache &>/dev/null; then
+    export CCACHE_DIR="$HOME/.cache/ccache"
+    export KBUILD_BUILD_TIMESTAMP="0"
+    export KBUILD_BUILD_USER="vng"
+    export KBUILD_BUILD_HOST="vng"
+    ccache --max-size 5G
+    ccache --set-config depend_mode=true
+    # Determine the compiler to wrap — explicit CC, or clang if LLVM, else gcc
+    if [ -n "${VNG_CC:-}" ]; then
+        _CC="$VNG_CC"
+    elif [ -n "${VNG_LLVM:-}" ]; then
+        if [ "$VNG_LLVM" = "1" ]; then _CC="clang"; else _CC="clang${VNG_LLVM}"; fi
+    else
+        _CC="gcc"
+    fi
+    MAKE_VARS+=(CC="ccache $_CC" HOSTCC="ccache $_CC")
+fi
 if [ -n "${VNG_KCONFIG:-}" ]; then
     KCONFIG_PATH="$GITHUB_WORKSPACE/$VNG_KCONFIG"
     if [ ! -f "$KCONFIG_PATH" ]; then
@@ -35,16 +65,17 @@ if [ -n "${VNG_KCONFIG:-}" ]; then
 fi
 
 echo "::group::Building kernel with virtme-ng"
-vng "${BUILD_ARGS[@]}"
+vng "${BUILD_ARGS[@]}" "${MAKE_VARS[@]}"
 echo "::endgroup::"
 
 # Keep only what virtme-ng needs to boot:
-#   .config, System.map, arch/x86/boot/bzImage, modules.order, .virtme_mods/
+#   .config, System.map, boot image, modules.order, .virtme_mods/
 echo "::group::Cleaning build tree for caching"
 CLEAN_DIR=$(mktemp -d)
 cp .config System.map modules.order modules.builtin modules.builtin.modinfo "$CLEAN_DIR/"
-mkdir -p "$CLEAN_DIR/arch/x86/boot"
-cp arch/x86/boot/bzImage "$CLEAN_DIR/arch/x86/boot/"
+BOOT_IMAGE=$(make -s "${MAKE_VARS[@]}" image_name)
+mkdir -p "$CLEAN_DIR/$(dirname "$BOOT_IMAGE")"
+cp "$BOOT_IMAGE" "$CLEAN_DIR/$BOOT_IMAGE"
 if [ -d .virtme_mods ]; then
     cp -rL .virtme_mods "$CLEAN_DIR/"
 fi

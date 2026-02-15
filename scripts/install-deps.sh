@@ -6,7 +6,7 @@ PACKAGES=(
     cpio kmod pkg-config rsync
     libelf-dev libssl-dev libzstd-dev dwarves
     linux-headers-generic linux-tools-common linux-tools-generic
-    qemu-system-x86 busybox-static
+    qemu-system-x86 busybox-static ccache
 )
 
 if dpkg -s "${PACKAGES[@]}" &>/dev/null && command -v vng &>/dev/null; then

@@ -1,6 +1,6 @@
 # virtme-ng Action
 
-Run CI workloads inside a [virtme-ng](https://github.com/arighi/virtme-ng) VM with a specific kernel version. The host filesystem is mounted as a copy-on-write overlay — the VM can read everything on the runner but cannot mutate it.
+Run CI workloads inside a [virtme-ng](https://github.com/arighi/virtme-ng) VM with a specific kernel version. The host filesystem is mounted as a copy-on-write overlay — the VM can read everything on the runner but writes go to a tmpfs overlay by default.
 
 ## Quick Start
 
@@ -19,13 +19,19 @@ steps:
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `name` | Yes | | Name for the kernel build cache |
+| `name` | Yes | | Name for the kernel build cache (also embedded in `uname -r`) |
 | `kernel-url` | Yes | | Git repository URL for the kernel source |
 | `kernel-tag` | Yes | | Git tag or branch to checkout |
-| `version` | No | `v1` | Cache version string — bump to force a rebuild |
+| `version` | No | `v2` | Cache version string — bump to force a rebuild |
 | `kconfig` | No | | Path to a kconfig fragment file (relative to repo root) |
-| `cpus` | No | all available | Number of CPUs for the VM |
-| `memory` | No | QEMU default | Memory for the VM (e.g., `4G`, `512M`) |
+| `cpus` | No | | Number of CPUs for the VM |
+| `memory` | No | | Memory for the VM (e.g., `4G`, `512M`) |
+| `network` | No | | Network mode for the VM (e.g., `user`) |
+| `cc` | No | | C compiler for the kernel build (e.g., `clang`) |
+| `llvm` | No | | Use full LLVM toolchain (`1` or `-14` for versioned) |
+| `arch` | No | | Target architecture (e.g., `arm64`) |
+| `cross-compile` | No | | Cross-compilation prefix (e.g., `aarch64-linux-gnu-`) |
+| `kernel-compile-cache` | No | `true` | Use ccache to speed up kernel rebuilds on cache miss |
 | `run` | Yes | | Commands to execute inside the VM |
 
 ## Outputs
@@ -36,13 +42,13 @@ steps:
 
 ## How It Works
 
-1. **Install** — installs kernel build toolchain, QEMU, and virtme-ng via apt. Skips if already present. Configures KVM access on CI runners.
+1. **Install** — installs kernel build toolchain, QEMU, ccache, and virtme-ng via apt. Skips if already present. Configures KVM access on CI runners.
 2. **Resolve** — checks for a SHA cached by a prior job in this workflow run (scoped to `run_id`). On miss, resolves `kernel-tag` to a commit SHA via `git ls-remote` and saves it for subsequent jobs.
 3. **Cache** — checks for a cached kernel build keyed on `{name}-{sha}-{version}`. On hit, the build step is skipped entirely. The cache is shared across all jobs in the repository.
-4. **Build** (cache miss only) — shallow-clones the kernel repo and runs `vng --build` to compile a minimal kernel.
+4. **Build** (cache miss only) — shallow-clones the kernel repo and runs `vng --build` to compile a minimal kernel. Uses ccache when `kernel-compile-cache` is enabled (default). Sets `LOCALVERSION` so `uname -r` includes the build name and commit SHA (e.g., `6.12.0__myproject__abc123def456`).
 5. **Run** — boots the kernel in a QEMU VM via virtme-ng. Your `run` commands execute inside the VM with the working directory set to `$GITHUB_WORKSPACE`.
 
-The VM uses virtme-ng's default copy-on-write overlay: the entire host filesystem is visible inside the VM, but all writes go to a tmpfs overlay and do not persist back to the host.
+The VM uses virtme-ng's default copy-on-write overlay: the entire host filesystem is visible inside the VM, but all writes go to a tmpfs overlay and do not persist back to the host. GitHub Actions file commands (`$GITHUB_STEP_SUMMARY`, `$GITHUB_OUTPUT`, `$GITHUB_ENV`, `$GITHUB_PATH`) work transparently inside the VM — their backing directories are mounted read-write automatically.
 
 ## Examples
 
@@ -140,14 +146,16 @@ steps:
 
 ## Cache Management
 
-Two cache layers work together:
+Three cache layers work together:
 
 1. **SHA cache** (`vng-sha-{name}-{kernel-tag}-{run_id}`) — propagates the resolved commit SHA across jobs in the same workflow run. The first job resolves the tag and saves the SHA; subsequent jobs restore it automatically.
 2. **Kernel build cache** (`vng-kernel-{name}-{sha}-{version}`) — stores the compiled kernel tree, shared across all jobs and runs in the repository.
+3. **ccache** (`vng-ccache-{run_id}`) — compiler cache shared across all kernel builds in a workflow run. On cache miss, restores the most recent ccache from any prior run. Capped at 5 GB.
 
 - **Same `name` across jobs** → same kernel, automatically
 - **Bump `version`** → forces a rebuild (e.g., after changing kconfig)
 - **Different `kernel-tag` resolving to a new SHA** → new cache entry
+- **Set `kernel-compile-cache: false`** → disables ccache
 
 ## Supported Runners
 

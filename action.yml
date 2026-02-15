@@ -24,17 +24,37 @@ inputs:
     required: false
     default: ''
   cpus:
-    description: 'Number of CPUs for the VM (default: all available)'
+    description: 'Number of CPUs for the VM'
     required: false
     default: ''
   memory:
-    description: 'Memory for the VM, e.g. 4G, 512M (default: QEMU default)'
+    description: 'Memory for the VM, e.g. 4G, 512M'
     required: false
     default: ''
   network:
     description: 'Network mode for the VM, e.g. user (default: none)'
     required: false
     default: ''
+  cc:
+    description: 'C compiler for the kernel build (e.g., clang)'
+    required: false
+    default: ''
+  llvm:
+    description: 'Use the full LLVM toolchain (CC=clang, LD=ld.lld, AR=llvm-ar, etc.)'
+    required: false
+    default: ''
+  arch:
+    description: 'Target architecture (e.g., arm64, x86_64)'
+    required: false
+    default: ''
+  cross-compile:
+    description: 'Cross-compilation prefix (e.g., aarch64-linux-gnu-)'
+    required: false
+    default: ''
+  kernel-compile-cache:
+    description: 'Use ccache to speed up kernel rebuilds on cache miss (default: true)'
+    required: false
+    default: 'true'
   run:
     description: 'Commands to execute inside the VM'
     required: true
@@ -135,6 +155,15 @@ runs:
         path: linux
         key: vng-kernel-${{ inputs.name }}-${{ steps.kernel-sha.outputs.sha }}-${{ inputs.version }}
 
+    - name: Restore ccache
+      if: steps.kernel-cache.outputs.cache-hit != 'true' && inputs.kernel-compile-cache == 'true'
+      uses: actions/cache/restore@v4
+      id: ccache-restore
+      with:
+        path: ~/.cache/ccache
+        key: vng-ccache-${{ github.run_id }}
+        restore-keys: vng-ccache-
+
     - name: Clone and build kernel
       if: steps.kernel-cache.outputs.cache-hit != 'true'
       shell: bash
@@ -145,6 +174,18 @@ runs:
         VNG_KERNEL_NAME: ${{ inputs.name }}
         VNG_KCONFIG: ${{ inputs.kconfig }}
         VNG_KERNEL_DIR: ${{ github.workspace }}/linux
+        VNG_CC: ${{ inputs.cc }}
+        VNG_LLVM: ${{ inputs.llvm }}
+        VNG_ARCH: ${{ inputs.arch }}
+        VNG_CROSS_COMPILE: ${{ inputs.cross-compile }}
+        VNG_CCACHE: ${{ inputs.kernel-compile-cache }}
+
+    - name: Save ccache
+      if: steps.kernel-cache.outputs.cache-hit != 'true' && inputs.kernel-compile-cache == 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ~/.cache/ccache
+        key: vng-ccache-${{ github.run_id }}
 
     - name: Run workload in VM
       shell: bash
