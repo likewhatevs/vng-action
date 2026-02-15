@@ -38,4 +38,5 @@ vng "${VNG_ARGS[@]}" -- bash -c "echo '::endgroup::'
 echo '::group::Starting workload in vng VM'
 echo '::endgroup::'
 set -euo pipefail
+trap 'sync' EXIT
 $VNG_COMMANDS"
