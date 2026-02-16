@@ -15,8 +15,8 @@ if dpkg -s "${PACKAGES[@]}" &>/dev/null && command -v vng &>/dev/null; then
 fi
 
 echo "::group::Installing dependencies"
-sudo apt-get update -q
-sudo apt-get install -y -q "${PACKAGES[@]}" virtme-ng
+sudo apt-get update -qq
+sudo apt-get install -y -qq "${PACKAGES[@]}" virtme-ng
 echo "::endgroup::"
 
 if [ -e /dev/kvm ] && [ ! -f /etc/udev/rules.d/99-kvm4all.rules ]; then
