@@ -43,7 +43,7 @@ steps:
 ## How It Works
 
 1. **Install** — installs kernel build toolchain, QEMU, ccache, and virtme-ng via apt. Skips if already present. Configures KVM access on CI runners.
-2. **Resolve** — checks for a SHA cached by a prior job in this workflow run (scoped to `run_id`). On miss, resolves `kernel-tag` to a commit SHA via `git ls-remote` and saves it for subsequent jobs.
+2. **Resolve** — checks for a SHA cached by a prior job in this workflow run (scoped to `run_id`). On miss, resolves `kernel-tag` to a commit SHA via `git ls-remote` and saves it for subsequent jobs. If the remote is unreachable (e.g., kernel.org outage), falls back to the most recent cached kernel build for this name (see below).
 3. **Cache** — checks for a cached kernel build keyed on `{name}-{sha}-{version}`. On hit, the build step is skipped entirely. The cache is shared across all jobs in the repository.
 4. **Build** (cache miss only) — shallow-clones the kernel repo and runs `vng --build` to compile a minimal kernel. Uses ccache when `kernel-compile-cache` is enabled (default). Sets `LOCALVERSION` so `uname -r` includes the build name and commit SHA (e.g., `6.12.0__myproject__abc123def456`).
 5. **Run** — boots the kernel in a QEMU VM via virtme-ng. Your `run` commands execute inside the VM with the working directory set to `$GITHUB_WORKSPACE`.
@@ -156,6 +156,7 @@ Three cache layers work together:
 - **Bump `version`** → forces a rebuild (e.g., after changing kconfig)
 - **Different `kernel-tag` resolving to a new SHA** → new cache entry
 - **Set `kernel-compile-cache: false`** → disables ccache
+- **Remote unreachable** → restores the most recent cached kernel build matching `vng-kernel-{name}-` and emits a warning. Fails only if no cached build exists at all.
 
 ## Supported Runners
 

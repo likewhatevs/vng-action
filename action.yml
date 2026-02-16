@@ -123,10 +123,12 @@ runs:
         # For annotated tags, ls-remote returns both the tag object and the
         # dereferenced commit (tagged ^{}). Prefer the dereferenced commit
         # so we always resolve to the same underlying commit SHA.
-        REMOTE_OUTPUT=$(git ls-remote "${{ inputs.kernel-url }}" "${{ inputs.kernel-tag }}" "${{ inputs.kernel-tag }}^{}")
+        REMOTE_OUTPUT=$(git ls-remote "${{ inputs.kernel-url }}" "${{ inputs.kernel-tag }}" "${{ inputs.kernel-tag }}^{}" 2>/dev/null || true)
         if [ -z "$REMOTE_OUTPUT" ]; then
-          echo "::error::Could not resolve ref '${{ inputs.kernel-tag }}' from ${{ inputs.kernel-url }}"
-          exit 1
+          echo "::warning::Could not resolve ref '${{ inputs.kernel-tag }}' from ${{ inputs.kernel-url }}, will try stale cache"
+          echo "sha=" >> "$GITHUB_OUTPUT"
+          echo "remote_failed=true" >> "$GITHUB_OUTPUT"
+          exit 0
         fi
         # Take ^{} (dereferenced) line if present, otherwise the direct ref
         DEREF=$(echo "$REMOTE_OUTPUT" | { grep '\^{}' || true; } | awk '{print $1}')
@@ -139,21 +141,43 @@ runs:
         echo -n "$SHA" > "$SHA_FILE"
 
         echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+        echo "remote_failed=false" >> "$GITHUB_OUTPUT"
         echo "Resolved ${{ inputs.kernel-tag }} -> $SHA"
 
     - name: Save kernel SHA for subsequent jobs
-      if: steps.sha-cache-restore.outputs.cache-hit != 'true'
+      if: steps.sha-cache-restore.outputs.cache-hit != 'true' && steps.kernel-sha.outputs.sha != ''
       uses: actions/cache/save@v4
       with:
         path: .vng-sha-${{ inputs.name }}
         key: vng-sha-${{ inputs.name }}-${{ inputs.kernel-tag }}-${{ github.run_id }}
 
     - name: Cache kernel build
+      if: steps.kernel-sha.outputs.sha != ''
       uses: actions/cache@v4
       id: kernel-cache
       with:
         path: linux
         key: vng-kernel-${{ inputs.name }}-${{ steps.kernel-sha.outputs.sha }}-${{ inputs.version }}
+
+    - name: Fallback to most recent cached kernel
+      if: steps.kernel-sha.outputs.remote_failed == 'true'
+      id: stale-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: linux
+        key: vng-kernel-${{ inputs.name }}-impossible-key-to-force-prefix-match
+        restore-keys: |
+          vng-kernel-${{ inputs.name }}-
+
+    - name: Verify stale cache fallback
+      if: steps.kernel-sha.outputs.remote_failed == 'true'
+      shell: bash
+      run: |
+        if [ ! -d linux ] || [ ! -f linux/vmlinux ]; then
+          echo "::error::Remote unreachable and no cached kernel found for ${{ inputs.name }}"
+          exit 1
+        fi
+        echo "::warning::Using stale cached kernel for ${{ inputs.name }} (remote was unreachable)"
 
     - name: Restore ccache
       if: steps.kernel-cache.outputs.cache-hit != 'true' && inputs.kernel-compile-cache == 'true'
