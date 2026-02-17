@@ -30,12 +30,6 @@ fi
 if [ -n "${VNG_CC:-}" ]; then
     MAKE_VARS+=(CC="$VNG_CC" HOSTCC="$VNG_CC")
 fi
-if [ -n "${VNG_ARCH:-}" ]; then
-    MAKE_VARS+=(ARCH="$VNG_ARCH")
-fi
-if [ -n "${VNG_CROSS_COMPILE:-}" ]; then
-    MAKE_VARS+=(CROSS_COMPILE="$VNG_CROSS_COMPILE")
-fi
 if [ "${VNG_CCACHE:-}" = "true" ] && command -v ccache &>/dev/null; then
     export CCACHE_DIR="$HOME/.cache/ccache"
     export KBUILD_BUILD_TIMESTAMP="0"
@@ -75,12 +69,23 @@ echo "::endgroup::"
 #   .config, System.map, boot image, modules.order, .virtme_mods/
 echo "::group::Cleaning build tree for caching"
 CLEAN_DIR=$(mktemp -d)
-cp .config System.map modules.order modules.builtin modules.builtin.modinfo "$CLEAN_DIR/"
+cp -p .config System.map modules.order modules.builtin modules.builtin.modinfo "$CLEAN_DIR/"
 BOOT_IMAGE=$(make -s "${MAKE_VARS[@]}" image_name)
 mkdir -p "$CLEAN_DIR/$(dirname "$BOOT_IMAGE")"
 cp "$BOOT_IMAGE" "$CLEAN_DIR/$BOOT_IMAGE"
+# vng may look for a different image than make image_name reports (e.g., arm64:
+# make reports Image.gz but vng needs the uncompressed Image). Copy all boot
+# images from the same directory so vng can find what it needs.
+BOOT_DIR=$(dirname "$BOOT_IMAGE")
+for img in "$BOOT_DIR"/{Image,Image.gz,bzImage}; do
+    [ -f "$img" ] && [ ! -f "$CLEAN_DIR/$img" ] && cp "$img" "$CLEAN_DIR/$img"
+done
 if [ -d .virtme_mods ]; then
-    cp -rL .virtme_mods "$CLEAN_DIR/"
+    cp -a .virtme_mods "$CLEAN_DIR/"
+    # Remove build/source symlinks that point back into the full tree;
+    # they'll dangle after cleanup and aren't needed to boot.
+    rm -f "$CLEAN_DIR"/.virtme_mods/lib/modules/*/build \
+          "$CLEAN_DIR"/.virtme_mods/lib/modules/*/source
 fi
 # Preserve .ko files at their build tree locations (depmod scans these via build symlink)
 find . -name '*.ko' -type f | while read -r ko; do

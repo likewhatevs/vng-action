@@ -24,17 +24,21 @@ inputs:
     required: false
     default: ''
   cpus:
-    description: 'Number of CPUs for the VM'
+    description: 'Number of CPUs for the VM (default: all host CPUs)'
     required: false
     default: ''
   memory:
-    description: 'Memory for the VM, e.g. 4G, 512M'
+    description: 'Memory for the VM, e.g. 4G, 512M (default: 90% of host RAM)'
     required: false
     default: ''
   network:
     description: 'Network mode for the VM, e.g. user (default: none)'
     required: false
     default: ''
+  verbose:
+    description: 'Enable verbose vng boot output'
+    required: false
+    default: 'true'
   cc:
     description: 'C compiler for the kernel build (e.g., clang)'
     required: false
@@ -43,18 +47,42 @@ inputs:
     description: 'Use the full LLVM toolchain (CC=clang, LD=ld.lld, AR=llvm-ar, etc.)'
     required: false
     default: ''
-  arch:
-    description: 'Target architecture (e.g., arm64, x86_64)'
-    required: false
-    default: ''
-  cross-compile:
-    description: 'Cross-compilation prefix (e.g., aarch64-linux-gnu-)'
-    required: false
-    default: ''
   kernel-compile-cache:
     description: 'Use ccache to speed up kernel rebuilds on cache miss (default: true)'
     required: false
     default: 'true'
+  deps-timeout:
+    description: 'Timeout in seconds for dependency installation (per attempt)'
+    required: false
+    default: '90'
+  deps-retries:
+    description: 'Number of retry attempts for dependency installation'
+    required: false
+    default: '3'
+  append:
+    description: 'Additional kernel boot parameters passed to vng via --append'
+    required: false
+    default: 'mitigations=off'
+  qemu-opts:
+    description: 'Additional QEMU options passed to vng via --qemu-opts'
+    required: false
+    default: '-cpu host'
+  run-timeout:
+    description: 'Timeout in seconds for the VM workload (0 = no timeout)'
+    required: false
+    default: '0'
+  packages:
+    description: 'Extra apt packages to install and cache alongside vng dependencies (space-separated)'
+    required: false
+    default: ''
+  install-recommends:
+    description: 'Install recommended packages alongside dependencies (default: false)'
+    required: false
+    default: 'false'
+  extra-rwdirs:
+    description: 'Additional host directories to mount read-write in the VM (space-separated, tilde-expanded)'
+    required: false
+    default: '~/.cargo'
   run:
     description: 'Commands to execute inside the VM'
     required: true
@@ -69,35 +97,75 @@ runs:
   steps:
     - name: Validate inputs
       shell: bash
+      env:
+        VNG_NAME: ${{ inputs.name }}
+        VNG_KERNEL_URL: ${{ inputs.kernel-url }}
+        VNG_KERNEL_TAG: ${{ inputs.kernel-tag }}
+        VNG_RUN: ${{ inputs.run }}
+        VNG_KCONFIG: ${{ inputs.kconfig }}
       run: |
         errors=0
-        if [ -z "${{ inputs.name }}" ]; then
+        if [ -z "$VNG_NAME" ]; then
           echo "::error::Input 'name' is required but was not provided."
           errors=$((errors + 1))
         fi
-        if [ -z "${{ inputs.kernel-url }}" ]; then
+        if [ -z "$VNG_KERNEL_URL" ]; then
           echo "::error::Input 'kernel-url' is required but was not provided."
           errors=$((errors + 1))
         fi
-        if [ -z "${{ inputs.kernel-tag }}" ]; then
+        if [ -z "$VNG_KERNEL_TAG" ]; then
           echo "::error::Input 'kernel-tag' is required but was not provided."
           errors=$((errors + 1))
         fi
-        if [ -z "${{ inputs.run }}" ]; then
+        if [ -z "$VNG_RUN" ]; then
           echo "::error::Input 'run' is required but was not provided."
           errors=$((errors + 1))
         fi
-        if [ -n "${{ inputs.kconfig }}" ] && [ ! -f "$GITHUB_WORKSPACE/${{ inputs.kconfig }}" ]; then
-          echo "::error::kconfig file not found: '${{ inputs.kconfig }}' (resolved to '$GITHUB_WORKSPACE/${{ inputs.kconfig }}')"
+        if [ -n "$VNG_KCONFIG" ] && [ ! -f "$GITHUB_WORKSPACE/$VNG_KCONFIG" ]; then
+          echo "::error::kconfig file not found: '$VNG_KCONFIG' (resolved to '$GITHUB_WORKSPACE/$VNG_KCONFIG')"
           errors=$((errors + 1))
         fi
         if [ "$errors" -gt 0 ]; then
           exit 1
         fi
 
+    - name: Fix apt cache permissions for restore
+      shell: bash
+      run: sudo chown -R "$(id -u):$(id -g)" /var/cache/apt/archives
+
+    - name: Restore apt cache
+      id: apt-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: /var/cache/apt/archives
+        key: vng-apt-${{ runner.arch }}-${{ github.run_id }}
+        restore-keys: vng-apt-${{ runner.arch }}-
+
+    - name: Restore apt cache ownership
+      shell: bash
+      run: sudo chown -R root:root /var/cache/apt/archives
+
     - name: Install dependencies
       shell: bash
       run: bash "${{ github.action_path }}/scripts/install-deps.sh"
+      env:
+        VNG_DEPS_TIMEOUT: ${{ inputs.deps-timeout }}
+        VNG_DEPS_RETRIES: ${{ inputs.deps-retries }}
+        VNG_EXTRA_PACKAGES: ${{ inputs.packages }}
+        VNG_INSTALL_RECOMMENDS: ${{ inputs.install-recommends }}
+
+    - name: Save apt cache
+      if: steps.apt-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        sudo rm -f /var/cache/apt/archives/lock
+        sudo rm -rf /var/cache/apt/archives/partial
+        sudo chown -R "$(id -u):$(id -g)" /var/cache/apt/archives
+    - uses: actions/cache/save@v4
+      if: steps.apt-cache.outputs.cache-hit != 'true'
+      with:
+        path: /var/cache/apt/archives
+        key: vng-apt-${{ runner.arch }}-${{ github.run_id }}
 
     - name: Restore kernel SHA from prior job
       id: sha-cache-restore
@@ -151,13 +219,13 @@ runs:
         path: .vng-sha-${{ inputs.name }}
         key: vng-sha-${{ inputs.name }}-${{ inputs.kernel-tag }}-${{ github.run_id }}
 
-    - name: Cache kernel build
+    - name: Restore kernel build cache
       if: steps.kernel-sha.outputs.sha != ''
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       id: kernel-cache
       with:
         path: linux
-        key: vng-kernel-${{ inputs.name }}-${{ steps.kernel-sha.outputs.sha }}-${{ inputs.version }}
+        key: vng-kernel-${{ inputs.name }}-${{ runner.arch }}-${{ steps.kernel-sha.outputs.sha }}-${{ inputs.version }}
 
     - name: Fallback to most recent cached kernel
       if: steps.kernel-sha.outputs.remote_failed == 'true'
@@ -165,15 +233,15 @@ runs:
       uses: actions/cache/restore@v4
       with:
         path: linux
-        key: vng-kernel-${{ inputs.name }}-impossible-key-to-force-prefix-match
+        key: vng-kernel-${{ inputs.name }}-${{ runner.arch }}-impossible-key-to-force-prefix-match
         restore-keys: |
-          vng-kernel-${{ inputs.name }}-
+          vng-kernel-${{ inputs.name }}-${{ runner.arch }}-
 
     - name: Verify stale cache fallback
       if: steps.kernel-sha.outputs.remote_failed == 'true'
       shell: bash
       run: |
-        if [ ! -d linux ] || [ ! -f linux/vmlinux ]; then
+        if [ ! -d linux ] || [ ! -f linux/.config ]; then
           echo "::error::Remote unreachable and no cached kernel found for ${{ inputs.name }}"
           exit 1
         fi
@@ -185,11 +253,11 @@ runs:
       id: ccache-restore
       with:
         path: ~/.cache/ccache
-        key: vng-ccache-${{ github.run_id }}
-        restore-keys: vng-ccache-
+        key: vng-ccache-${{ runner.arch }}-${{ github.run_id }}
+        restore-keys: vng-ccache-${{ runner.arch }}-
 
     - name: Clone and build kernel
-      if: steps.kernel-cache.outputs.cache-hit != 'true'
+      if: steps.kernel-cache.outputs.cache-hit != 'true' && steps.kernel-sha.outputs.remote_failed != 'true'
       shell: bash
       run: bash "${{ github.action_path }}/scripts/build-kernel.sh"
       env:
@@ -200,16 +268,21 @@ runs:
         VNG_KERNEL_DIR: ${{ github.workspace }}/linux
         VNG_CC: ${{ inputs.cc }}
         VNG_LLVM: ${{ inputs.llvm }}
-        VNG_ARCH: ${{ inputs.arch }}
-        VNG_CROSS_COMPILE: ${{ inputs.cross-compile }}
         VNG_CCACHE: ${{ inputs.kernel-compile-cache }}
 
+    - name: Save kernel build cache
+      if: steps.kernel-cache.outputs.cache-hit != 'true' && steps.kernel-sha.outputs.remote_failed != 'true' && steps.kernel-sha.outputs.sha != ''
+      uses: actions/cache/save@v4
+      with:
+        path: linux
+        key: vng-kernel-${{ inputs.name }}-${{ runner.arch }}-${{ steps.kernel-sha.outputs.sha }}-${{ inputs.version }}
+
     - name: Save ccache
-      if: steps.kernel-cache.outputs.cache-hit != 'true' && inputs.kernel-compile-cache == 'true'
+      if: steps.kernel-cache.outputs.cache-hit != 'true' && steps.kernel-sha.outputs.remote_failed != 'true' && inputs.kernel-compile-cache == 'true'
       uses: actions/cache/save@v4
       with:
         path: ~/.cache/ccache
-        key: vng-ccache-${{ github.run_id }}
+        key: vng-ccache-${{ runner.arch }}-${{ github.run_id }}
 
     - name: Run workload in VM
       shell: bash
@@ -220,3 +293,8 @@ runs:
         VNG_CPUS: ${{ inputs.cpus }}
         VNG_MEMORY: ${{ inputs.memory }}
         VNG_NETWORK: ${{ inputs.network }}
+        VNG_VERBOSE: ${{ inputs.verbose }}
+        VNG_RUN_TIMEOUT: ${{ inputs.run-timeout }}
+        VNG_EXTRA_RWDIRS: ${{ inputs.extra-rwdirs }}
+        VNG_APPEND: ${{ inputs.append }}
+        VNG_QEMU_OPTS: ${{ inputs.qemu-opts }}

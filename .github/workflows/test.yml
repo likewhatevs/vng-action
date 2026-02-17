@@ -16,6 +16,7 @@ jobs:
           name: test-kernel
           kernel-url: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
           kernel-tag: v6.12
+          version: build-${{ github.run_id }}
           run: |
             uname -r
             echo "Hello from inside the VM"
@@ -25,11 +26,38 @@ jobs:
           test -n "${{ steps.vng.outputs.kernel-sha }}"
           echo "kernel-sha: ${{ steps.vng.outputs.kernel-sha }}"
 
-  cross-job-cache:
+  restore:
     needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Restore kernel SHA from build job
+        uses: actions/cache/restore@v4
+        with:
+          path: .vng-sha-test-kernel
+          key: vng-sha-test-kernel-v6.12-${{ github.run_id }}
+
+      - name: Verify SHA propagation
+        id: sha
+        run: |
+          SHA=$(cat .vng-sha-test-kernel/sha 2>/dev/null || echo "")
+          test -n "$SHA" || { echo "::error::SHA not propagated from build job"; exit 1; }
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Verify kernel cache exists
+        uses: actions/cache/restore@v4
+        id: cache-check
+        with:
+          path: linux
+          key: vng-kernel-test-kernel-${{ runner.arch }}-${{ steps.sha.outputs.sha }}-build-${{ github.run_id }}
+          lookup-only: true
+
+      - name: Fail on cache miss
+        if: steps.cache-check.outputs.cache-hit != 'true'
+        run: |
+          echo "::error::Kernel build cache not found — build job did not populate cache"
+          exit 1
 
       - uses: ./
         id: vng
@@ -37,14 +65,31 @@ jobs:
           name: test-kernel
           kernel-url: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
           kernel-tag: v6.12
+          version: build-${{ github.run_id }}
           run: |
             uname -r
             echo "Cross-job cache hit test"
 
-      - name: Verify SHA matches
+  build-arm:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./
+        id: vng
+        with:
+          name: test-kernel-arm
+          kernel-url: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+          kernel-tag: v6.12
+          version: build-${{ github.run_id }}
+          run: |
+            uname -r
+            echo "Hello from inside the VM"
+
+      - name: Verify outputs
         run: |
-          echo "kernel-sha: ${{ steps.vng.outputs.kernel-sha }}"
           test -n "${{ steps.vng.outputs.kernel-sha }}"
+          echo "kernel-sha: ${{ steps.vng.outputs.kernel-sha }}"
 
   shellcheck:
     runs-on: ubuntu-latest
