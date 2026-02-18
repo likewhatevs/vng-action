@@ -25,14 +25,14 @@ steps:
 | `version` | No | `v2` | Cache version string — bump to force a rebuild |
 | `kconfig` | No | | Path to a kconfig fragment file (relative to repo root) |
 | `cpus` | No | all host CPUs | Number of CPUs for the VM |
-| `memory` | No | 90% of host RAM | Memory for the VM (e.g., `4G`, `512M`) |
+| `memory` | No | 90% of host RAM (capped at 4G on ARM64) | Memory for the VM (e.g., `4G`, `512M`) |
 | `network` | No | | Network mode for the VM (e.g., `user`) |
 | `verbose` | No | `true` | Enable verbose vng boot output |
 | `cc` | No | | C compiler for the kernel build (e.g., `clang`) |
 | `llvm` | No | | Use full LLVM toolchain (`1` or `-14` for versioned) |
 | `kernel-compile-cache` | No | `true` | Use ccache to speed up kernel rebuilds on cache miss |
 | `append` | No | `mitigations=off` | Additional kernel boot parameters passed to vng via `--append` |
-| `qemu-opts` | No | `-cpu host` | Additional QEMU options passed to vng via `--qemu-opts` |
+| `qemu-opts` | No | `-cpu host` (dropped on ARM64) | Additional QEMU options passed to vng via `--qemu-opts` |
 | `deps-timeout` | No | `90` | Timeout in seconds for dependency installation (per attempt) |
 | `deps-retries` | No | `3` | Number of retry attempts for dependency installation |
 | `run-timeout` | No | `0` | Timeout in seconds for the VM workload (`0` = no timeout) |
@@ -213,7 +213,7 @@ Four cache layers work together:
 | `ubuntu-22.04`, `ubuntu-24.04` | x86_64 | Supported |
 | `ubuntu-22.04-arm`, `ubuntu-24.04-arm` | ARM64 | Supported |
 
-KVM must be available on the runner for reasonable performance. GitHub-hosted Linux runners have KVM enabled by default.
+KVM must be available on the runner for reasonable performance. GitHub-hosted x86 Linux runners have KVM enabled by default. ARM64 runners currently lack KVM, so the VM falls back to software emulation (TCG) — memory is capped at 4G and `-cpu host` is stripped from `qemu-opts` automatically.
 
 ## License
 

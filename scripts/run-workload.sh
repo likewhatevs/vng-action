@@ -9,7 +9,20 @@ fi
 KERNEL_DIR="${VNG_KERNEL_DIR:?VNG_KERNEL_DIR is not set}"
 
 : "${VNG_CPUS:=$(nproc)}"
-: "${VNG_MEMORY:=$(awk '/MemTotal/ { printf "%dM", $2 * 0.9 / 1024 }' /proc/meminfo)}"
+if [ -z "${VNG_MEMORY:-}" ]; then
+    VNG_MEMORY=$(awk '/MemTotal/ { printf "%d", $2 * 0.9 / 1024 }' /proc/meminfo)
+    # ARM64 without KVM uses TCG+GICv2 which limits addressing to 32 bits
+    if [ "$(uname -m)" = "aarch64" ] && [ "$VNG_MEMORY" -gt 4096 ]; then
+        VNG_MEMORY=4096
+    fi
+    VNG_MEMORY="${VNG_MEMORY}M"
+fi
+
+# -cpu host requires KVM; drop it on ARM64 where runners may lack /dev/kvm
+if [ "$(uname -m)" = "aarch64" ]; then
+    VNG_QEMU_OPTS="${VNG_QEMU_OPTS//-cpu host/}"
+    VNG_QEMU_OPTS="${VNG_QEMU_OPTS## }"
+fi
 
 VNG_ARGS=(--cwd "$GITHUB_WORKSPACE" --rwdir "$GITHUB_WORKSPACE"
           --pin --cpus "$VNG_CPUS" --memory "$VNG_MEMORY"

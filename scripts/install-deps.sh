@@ -55,6 +55,21 @@ if ! dpkg -s "${PACKAGES[@]}" &>/dev/null || [ ! -x "${PIPX_BIN}/vng" ]; then
         exit 1
     fi
     echo "$PIPX_BIN" >> "$GITHUB_PATH"
+
+    # On arm64, the pipx-bundled virtme-ng-init is x86_64; build native
+    if [ "$(dpkg --print-architecture)" = "arm64" ]; then
+        echo "Building native virtme-ng-init for arm64..."
+        cargo install --git https://github.com/arighi/virtme-ng.git virtme-ng-init -q
+        INIT_BIN=$(find "$(pipx environment --value PIPX_LOCAL_VENVS)/virtme-ng" \
+            -name virtme-ng-init -type f 2>/dev/null | head -1)
+        if [ -n "$INIT_BIN" ]; then
+            cp "$HOME/.cargo/bin/virtme-ng-init" "$INIT_BIN"
+            echo "Replaced bundled virtme-ng-init with native arm64 build"
+        else
+            echo "::error::Could not find bundled virtme-ng-init to replace"
+            exit 1
+        fi
+    fi
     echo "::endgroup::"
 fi
 
