@@ -60,25 +60,55 @@ if [ -n "${VNG_KCONFIG:-}" ]; then
     echo "Using kconfig fragment: $VNG_KCONFIG"
     BUILD_ARGS+=(--config "$KCONFIG_PATH")
 fi
-
 echo "::group::Building kernel with virtme-ng"
 vng "${BUILD_ARGS[@]}" "${MAKE_VARS[@]}"
 echo "::endgroup::"
+
+# vng --force overrides --config fragments for DEBUG_INFO, so patch the
+# config after generation and do an incremental rebuild if needed.
+if [ "${VNG_VMLINUX_H:-}" = "true" ] && ! grep -q 'CONFIG_DEBUG_INFO_BTF=y' .config; then
+    echo "::group::Rebuilding with CONFIG_DEBUG_INFO_BTF=y"
+    scripts/config --enable DEBUG_INFO \
+                   --disable DEBUG_INFO_NONE \
+                   --enable DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT \
+                   --enable DEBUG_INFO_BTF
+    make olddefconfig "${MAKE_VARS[@]}" -s
+    if ! grep -q 'CONFIG_DEBUG_INFO_BTF=y' .config; then
+        echo "::warning::CONFIG_DEBUG_INFO_BTF=y could not be enabled (missing dependencies?)"
+        grep 'CONFIG_DEBUG_INFO' .config || true
+    else
+        make -j"$(nproc)" "${MAKE_VARS[@]}" -s
+        if readelf -S vmlinux 2>/dev/null | grep -q '\.BTF'; then
+            echo "vmlinux .BTF section present"
+        else
+            echo "::warning::vmlinux rebuilt but .BTF section missing (pahole issue?)"
+        fi
+    fi
+    echo "::endgroup::"
+fi
 
 # Generate vmlinux.h for BPF applications (must happen before tree cleanup)
 if [ "${VNG_VMLINUX_H:-}" = "true" ] && [ -f vmlinux ]; then
     echo "::group::Generating vmlinux.h"
     BPFTOOL=""
-    if command -v bpftool &>/dev/null; then
-        BPFTOOL="bpftool"
-    elif [ -d tools/bpf/bpftool ]; then
-        make -C tools/bpf/bpftool -j"$(nproc)" -s
-        BPFTOOL="tools/bpf/bpftool/bpftool"
+    # Build standalone bpftool (avoids kernel tree LLVM skeleton deps)
+    if [ ! -x /tmp/bpftool/src/bpftool ]; then
+        if git clone --depth 1 --recurse-submodules https://github.com/libbpf/bpftool /tmp/bpftool 2>/dev/null \
+            && make -C /tmp/bpftool/src -j"$(nproc)" -s LLVM_STRIP=/bin/true 2>/tmp/bpftool-build.log; then
+            BPFTOOL="/tmp/bpftool/src/bpftool"
+        else
+            echo "::warning::Failed to build standalone bpftool:"
+            cat /tmp/bpftool-build.log 2>/dev/null || true
+        fi
+    else
+        BPFTOOL="/tmp/bpftool/src/bpftool"
     fi
-    if [ -n "$BPFTOOL" ] && "$BPFTOOL" btf dump file vmlinux format c > vmlinux.h 2>/dev/null; then
+    if [ -z "$BPFTOOL" ]; then
+        echo "::warning::bpftool not available, skipping vmlinux.h generation"
+    elif "$BPFTOOL" btf dump file vmlinux format c > vmlinux.h; then
         echo "Generated vmlinux.h ($(wc -c < vmlinux.h) bytes)"
     else
-        echo "::warning::Could not generate vmlinux.h (missing bpftool or BTF info)"
+        echo "::warning::vmlinux lacks BTF info (ensure CONFIG_DEBUG_INFO_BTF=y)"
         rm -f vmlinux.h
     fi
     echo "::endgroup::"

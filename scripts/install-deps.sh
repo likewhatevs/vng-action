@@ -20,6 +20,23 @@ if [ -n "${VNG_EXTRA_PACKAGES:-}" ]; then
     PACKAGES+=("${extra[@]}")
 fi
 
+# Harden apt against flaky mirrors
+echo 'Acquire::ForceIPv4 "true";'        | sudo tee /etc/apt/apt.conf.d/99force-ipv4 >/dev/null
+echo 'Acquire::Queue-Mode "access";'     | sudo tee /etc/apt/apt.conf.d/99queue-mode >/dev/null
+echo 'Acquire::http::Pipeline-Depth "0";' | sudo tee /etc/apt/apt.conf.d/99pipeline >/dev/null
+echo 'Acquire::Retries "3";'             | sudo tee /etc/apt/apt.conf.d/99retries >/dev/null
+echo 'Acquire::Languages "none";'        | sudo tee /etc/apt/apt.conf.d/99no-languages >/dev/null
+echo 'Dpkg::Use-Pty "0";'               | sudo tee /etc/apt/apt.conf.d/99no-pty >/dev/null
+# Use mirror:// protocol for automatic mirror selection
+sudo sed -i -E \
+    -e 's|https?://([a-z0-9-]+\.)*archive\.ubuntu\.com/ubuntu|mirror://mirrors.ubuntu.com/mirrors.txt|g' \
+    -e 's|https?://security\.ubuntu\.com/ubuntu|mirror://mirrors.ubuntu.com/mirrors.txt|g' \
+    /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null || true
+sudo sed -i -E \
+    -e 's|https?://([a-z0-9-]+\.)*archive\.ubuntu\.com/ubuntu/?|mirror://mirrors.ubuntu.com/mirrors.txt|g' \
+    -e 's|https?://security\.ubuntu\.com/ubuntu/?|mirror://mirrors.ubuntu.com/mirrors.txt|g' \
+    /etc/apt/sources.list.d/*.sources 2>/dev/null || true
+
 PIPX_BIN=$(pipx environment --value PIPX_BIN_DIR 2>/dev/null || echo "")
 if ! dpkg -s "${PACKAGES[@]}" &>/dev/null || [ ! -x "${PIPX_BIN}/vng" ]; then
     DEPS_LOG=$(mktemp)
