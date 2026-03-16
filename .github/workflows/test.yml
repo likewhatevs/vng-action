@@ -25,6 +25,12 @@ jobs:
           test -n "${{ steps.vng.outputs.kernel-sha }}"
           echo "kernel-sha: ${{ steps.vng.outputs.kernel-sha }}"
 
+      - name: Verify vmlinux.h
+        run: |
+          test -f linux/vmlinux.h || { echo "::error::vmlinux.h not found in cached kernel tree"; exit 1; }
+          test -s linux/vmlinux.h || { echo "::error::vmlinux.h is empty"; exit 1; }
+          echo "vmlinux.h: $(wc -c < linux/vmlinux.h) bytes"
+
   restore:
     needs: build
     runs-on: ubuntu-latest
@@ -68,6 +74,11 @@ jobs:
           run: |
             uname -r
             echo "Cross-job cache hit test"
+
+      - name: Verify vmlinux.h survives cache
+        run: |
+          test -f linux/vmlinux.h || { echo "::error::vmlinux.h not restored from cache"; exit 1; }
+          echo "vmlinux.h restored: $(wc -c < linux/vmlinux.h) bytes"
 
   build-arm:
     runs-on: ubuntu-24.04-arm

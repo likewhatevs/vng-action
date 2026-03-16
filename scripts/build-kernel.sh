@@ -65,6 +65,25 @@ echo "::group::Building kernel with virtme-ng"
 vng "${BUILD_ARGS[@]}" "${MAKE_VARS[@]}"
 echo "::endgroup::"
 
+# Generate vmlinux.h for BPF applications (must happen before tree cleanup)
+if [ "${VNG_VMLINUX_H:-}" = "true" ] && [ -f vmlinux ]; then
+    echo "::group::Generating vmlinux.h"
+    BPFTOOL=""
+    if command -v bpftool &>/dev/null; then
+        BPFTOOL="bpftool"
+    elif [ -d tools/bpf/bpftool ]; then
+        make -C tools/bpf/bpftool -j"$(nproc)" -s
+        BPFTOOL="tools/bpf/bpftool/bpftool"
+    fi
+    if [ -n "$BPFTOOL" ] && "$BPFTOOL" btf dump file vmlinux format c > vmlinux.h 2>/dev/null; then
+        echo "Generated vmlinux.h ($(wc -c < vmlinux.h) bytes)"
+    else
+        echo "::warning::Could not generate vmlinux.h (missing bpftool or BTF info)"
+        rm -f vmlinux.h
+    fi
+    echo "::endgroup::"
+fi
+
 # Keep only what virtme-ng needs to boot:
 #   .config, System.map, boot image, modules.order, .virtme_mods/
 echo "::group::Cleaning build tree for caching"
@@ -87,6 +106,7 @@ if [ -d .virtme_mods ]; then
     rm -f "$CLEAN_DIR"/.virtme_mods/lib/modules/*/build \
           "$CLEAN_DIR"/.virtme_mods/lib/modules/*/source
 fi
+[ -f vmlinux.h ] && cp vmlinux.h "$CLEAN_DIR/"
 # Preserve .ko files at their build tree locations (depmod scans these via build symlink)
 find . -name '*.ko' -type f | while read -r ko; do
     mkdir -p "$CLEAN_DIR/$(dirname "$ko")"

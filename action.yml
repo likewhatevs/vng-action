@@ -51,6 +51,10 @@ inputs:
     description: 'Use ccache to speed up kernel rebuilds on cache miss (default: true)'
     required: false
     default: 'true'
+  vmlinux-h:
+    description: 'Generate vmlinux.h from kernel BTF and cache it alongside the kernel (default: true)'
+    required: false
+    default: 'true'
   deps-timeout:
     description: 'Timeout in seconds for dependency installation (per attempt)'
     required: false
@@ -279,6 +283,7 @@ runs:
         VNG_CC: ${{ inputs.cc }}
         VNG_LLVM: ${{ inputs.llvm }}
         VNG_CCACHE: ${{ inputs.kernel-compile-cache }}
+        VNG_VMLINUX_H: ${{ inputs.vmlinux-h }}
 
     - name: Save kernel build cache
       if: steps.kernel-cache.outputs.cache-hit != 'true' && steps.kernel-sha.outputs.remote_failed != 'true' && steps.kernel-sha.outputs.sha != ''
