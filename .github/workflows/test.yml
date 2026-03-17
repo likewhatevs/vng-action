@@ -20,6 +20,8 @@ jobs:
             uname -r
             echo "Hello from inside the VM"
             echo "vng-summary-test" >> "$GITHUB_STEP_SUMMARY"
+            sync
+            sleep 5
             grep -q "vng-summary-test" "$GITHUB_STEP_SUMMARY"
 
       - name: Verify outputs
@@ -123,6 +125,8 @@ jobs:
           run: |
             uname -r
             echo "vng-ro-summary-test" >> "$GITHUB_STEP_SUMMARY"
+            sync
+            sleep 5
             grep -q "vng-ro-summary-test" "$GITHUB_STEP_SUMMARY"
 
       - name: Verify step summary written from ro-workspace VM
