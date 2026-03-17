@@ -19,13 +19,16 @@ jobs:
           run: |
             uname -r
             echo "Hello from inside the VM"
-            echo "vm-test=hello-from-vm" >> "$GITHUB_OUTPUT"
+            echo "vng-marker" > "$GITHUB_WORKSPACE/.vng-test-marker"
 
       - name: Verify outputs
         run: |
           test -n "${{ steps.vng.outputs.kernel-sha }}"
           echo "kernel-sha: ${{ steps.vng.outputs.kernel-sha }}"
-          test "${{ steps.vng.outputs.vm-test }}" = "hello-from-vm" || { echo "::error::GITHUB_OUTPUT not persisted from VM"; exit 1; }
+
+      - name: Verify workspace write from VM
+        run: |
+          grep -q "vng-marker" .vng-test-marker || { echo "::error::workspace write not persisted from VM"; exit 1; }
 
       - name: Verify vmlinux.h
         run: |
@@ -118,11 +121,12 @@ jobs:
           workspace-rw: false
           run: |
             uname -r
-            echo "vm-ro-test=hello-from-ro-vm" >> "$GITHUB_OUTPUT"
+            echo "this should fail" > "$GITHUB_WORKSPACE/.vng-ro-marker" 2>/dev/null && \
+              { echo "::error::workspace should be read-only but write succeeded"; exit 1; } || true
 
-      - name: Verify output written from ro-workspace VM
+      - name: Verify workspace is read-only
         run: |
-          test "${{ steps.vng.outputs.vm-ro-test }}" = "hello-from-ro-vm" || { echo "::error::GITHUB_OUTPUT not persisted from ro-workspace VM"; exit 1; }
+          test ! -f .vng-ro-marker || { echo "::error::marker file should not exist with ro workspace"; exit 1; }
 
   shellcheck:
     runs-on: ubuntu-latest
