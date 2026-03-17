@@ -7,7 +7,7 @@ Run CI workloads inside a [virtme-ng](https://github.com/arighi/virtme-ng) VM wi
 ```yaml
 steps:
   - uses: actions/checkout@v6
-  - uses: likewhatevs/vng-action@v1
+  - uses: likewhatevs/vng-action@v0.5.0
     with:
       name: mainline
       kernel-url: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
@@ -38,6 +38,9 @@ steps:
 | `run-timeout` | No | `0` | Timeout in seconds for the VM workload (`0` = no timeout) |
 | `packages` | No | | Extra apt packages to install and cache alongside vng dependencies (space-separated) |
 | `install-recommends` | No | `false` | Install recommended packages alongside dependencies |
+| `apt-cache` | No | `false` | Cache apt packages between runs |
+| `workspace-rw` | No | `true` | Mount `$GITHUB_WORKSPACE` read-write in the VM |
+| `vmlinux-h` | No | `true` | Generate `vmlinux.h` from kernel BTF and cache it alongside the kernel |
 | `extra-rwdirs` | No | `~/.cargo` | Additional host directories to mount read-write in the VM (space-separated, tilde-expanded) |
 | `run` | Yes | | Commands to execute inside the VM |
 
@@ -62,7 +65,7 @@ The VM shares the runner's filesystem via virtiofs. `$GITHUB_WORKSPACE` and any 
 ### With a custom kconfig
 
 ```yaml
-- uses: likewhatevs/vng-action@v1
+- uses: likewhatevs/vng-action@v0.5.0
   with:
     name: myproject
     kernel-url: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
@@ -74,14 +77,14 @@ The VM shares the runner's filesystem via virtiofs. `$GITHUB_WORKSPACE` and any 
 ### Multiple kernels in one job
 
 ```yaml
-- uses: likewhatevs/vng-action@v1
+- uses: likewhatevs/vng-action@v0.5.0
   with:
     name: stable
     kernel-url: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git
     kernel-tag: v6.6.50
     run: make test
 
-- uses: likewhatevs/vng-action@v1
+- uses: likewhatevs/vng-action@v0.5.0
   with:
     name: mainline
     kernel-url: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
@@ -97,7 +100,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v6
-      - uses: likewhatevs/vng-action@v1
+      - uses: likewhatevs/vng-action@v0.5.0
         with:
           name: mainline-arm
           kernel-url: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
@@ -115,7 +118,7 @@ jobs:
     runs-on: ubuntu-latest-16-cores
     steps:
       - uses: actions/checkout@v6
-      - uses: likewhatevs/vng-action@v1
+      - uses: likewhatevs/vng-action@v0.5.0
         with:
           name: sched-ext
           kernel-url: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
@@ -130,7 +133,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: likewhatevs/vng-action@v1
+      - uses: likewhatevs/vng-action@v0.5.0
         with:
           name: sched-ext
           kernel-url: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
@@ -151,7 +154,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: likewhatevs/vng-action@v1
+      - uses: likewhatevs/vng-action@v0.5.0
         with:
           name: mainline
           kernel-url: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
@@ -164,7 +167,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: likewhatevs/vng-action@v1
+      - uses: likewhatevs/vng-action@v0.5.0
         with:
           name: mainline
           kernel-url: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
@@ -183,7 +186,7 @@ steps:
   - uses: dtolnay/rust-toolchain@stable
   - uses: swatinem/rust-cache@v2
   - run: cargo fetch --locked
-  - uses: likewhatevs/vng-action@v1
+  - uses: likewhatevs/vng-action@v0.5.0
     with:
       name: mainline
       kernel-url: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
