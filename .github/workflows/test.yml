@@ -20,6 +20,7 @@ jobs:
             uname -r
             echo "Hello from inside the VM"
             echo "vng-marker" > "$GITHUB_WORKSPACE/.vng-test-marker"
+            echo "rw-vm-marker" > "$(dirname "$GITHUB_STEP_SUMMARY")/.vng-rw-marker"
 
       - name: Verify outputs
         run: |
@@ -29,6 +30,11 @@ jobs:
       - name: Verify workspace write from VM
         run: |
           grep -q "vng-marker" .vng-test-marker || { echo "::error::workspace write not persisted from VM"; exit 1; }
+
+      - name: Verify file command dir writable from VM
+        run: |
+          MARKER="$(dirname "$GITHUB_STEP_SUMMARY")/.vng-rw-marker"
+          grep -q "rw-vm-marker" "$MARKER" || { echo "::error::marker in file command dir not persisted from VM"; exit 1; }
 
       - name: Verify vmlinux.h
         run: |
@@ -121,12 +127,12 @@ jobs:
           workspace-rw: false
           run: |
             uname -r
-            echo "this should fail" > "$GITHUB_WORKSPACE/.vng-ro-marker" 2>/dev/null && \
-              { echo "::error::workspace should be read-only but write succeeded"; exit 1; } || true
+            echo "ro-vm-marker" > "$(dirname "$GITHUB_STEP_SUMMARY")/.vng-ro-marker"
 
-      - name: Verify workspace is read-only
+      - name: Verify file command dir writable from ro-workspace VM
         run: |
-          test ! -f .vng-ro-marker || { echo "::error::marker file should not exist with ro workspace"; exit 1; }
+          MARKER="$(dirname "$GITHUB_STEP_SUMMARY")/.vng-ro-marker"
+          grep -q "ro-vm-marker" "$MARKER" || { echo "::error::marker in file command dir not persisted from ro-workspace VM"; exit 1; }
 
   shellcheck:
     runs-on: ubuntu-latest

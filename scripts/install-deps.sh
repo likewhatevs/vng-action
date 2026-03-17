@@ -5,6 +5,7 @@ PACKAGES=(
     build-essential flex bison bc
     cpio kmod rsync
     libelf-dev libssl-dev libzstd-dev dwarves
+    binutils-dev libcap-dev llvm-dev
     virtiofsd busybox-static ccache
 )
 

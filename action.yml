@@ -83,6 +83,10 @@ inputs:
     description: 'Install recommended packages alongside dependencies (default: false)'
     required: false
     default: 'false'
+  apt-cache:
+    description: 'Cache apt packages between runs (default: false)'
+    required: false
+    default: 'false'
   workspace-rw:
     description: 'Mount $GITHUB_WORKSPACE read-write in the VM (default: true)'
     required: false
@@ -138,10 +142,12 @@ runs:
         fi
 
     - name: Fix apt cache permissions for restore
+      if: inputs.apt-cache == 'true'
       shell: bash
       run: sudo chown -R "$(id -u):$(id -g)" /var/cache/apt/archives
 
     - name: Restore apt cache
+      if: inputs.apt-cache == 'true'
       id: apt-cache
       uses: actions/cache/restore@v4
       with:
@@ -150,6 +156,7 @@ runs:
         restore-keys: vng-apt-${{ runner.arch }}-
 
     - name: Restore apt cache ownership
+      if: inputs.apt-cache == 'true'
       shell: bash
       run: sudo chown -R root:root /var/cache/apt/archives
 
@@ -163,14 +170,14 @@ runs:
         VNG_INSTALL_RECOMMENDS: ${{ inputs.install-recommends }}
 
     - name: Save apt cache
-      if: steps.apt-cache.outputs.cache-hit != 'true'
+      if: inputs.apt-cache == 'true' && steps.apt-cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         sudo rm -f /var/cache/apt/archives/lock
         sudo rm -rf /var/cache/apt/archives/partial
         sudo chown -R "$(id -u):$(id -g)" /var/cache/apt/archives
     - uses: actions/cache/save@v4
-      if: steps.apt-cache.outputs.cache-hit != 'true'
+      if: inputs.apt-cache == 'true' && steps.apt-cache.outputs.cache-hit != 'true'
       with:
         path: /var/cache/apt/archives
         key: vng-apt-${{ runner.arch }}-${{ github.run_id }}
