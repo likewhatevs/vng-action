@@ -6,7 +6,7 @@ Run CI workloads inside a [virtme-ng](https://github.com/arighi/virtme-ng) VM wi
 
 ```yaml
 steps:
-  - uses: actions/checkout@v4
+  - uses: actions/checkout@v6
   - uses: likewhatevs/vng-action@v1
     with:
       name: mainline
@@ -96,7 +96,7 @@ jobs:
   test:
     runs-on: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: likewhatevs/vng-action@v1
         with:
           name: mainline-arm
@@ -114,7 +114,7 @@ jobs:
   build-kernel:
     runs-on: ubuntu-latest-16-cores
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: likewhatevs/vng-action@v1
         with:
           name: sched-ext
@@ -129,7 +129,7 @@ jobs:
         suite: [test-rusty, test-lavd, test-bpfland]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: likewhatevs/vng-action@v1
         with:
           name: sched-ext
@@ -150,7 +150,7 @@ jobs:
   build-kernel:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: likewhatevs/vng-action@v1
         with:
           name: mainline
@@ -163,7 +163,7 @@ jobs:
     needs: build-kernel
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: likewhatevs/vng-action@v1
         with:
           name: mainline
@@ -179,7 +179,7 @@ Tools installed on the runner are visible inside the VM. `~/.cargo` is mounted r
 
 ```yaml
 steps:
-  - uses: actions/checkout@v4
+  - uses: actions/checkout@v6
   - uses: dtolnay/rust-toolchain@stable
   - uses: swatinem/rust-cache@v2
   - run: cargo fetch --locked

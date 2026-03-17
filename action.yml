@@ -149,7 +149,7 @@ runs:
     - name: Restore apt cache
       if: inputs.apt-cache == 'true'
       id: apt-cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: /var/cache/apt/archives
         key: vng-apt-${{ runner.arch }}-${{ github.run_id }}
@@ -176,7 +176,7 @@ runs:
         sudo rm -f /var/cache/apt/archives/lock
         sudo rm -rf /var/cache/apt/archives/partial
         sudo chown -R "$(id -u):$(id -g)" /var/cache/apt/archives
-    - uses: actions/cache/save@v4
+    - uses: actions/cache/save@v5
       if: inputs.apt-cache == 'true' && steps.apt-cache.outputs.cache-hit != 'true'
       with:
         path: /var/cache/apt/archives
@@ -184,7 +184,7 @@ runs:
 
     - name: Restore kernel SHA from prior job
       id: sha-cache-restore
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: .vng-sha-${{ inputs.name }}
         key: vng-sha-${{ inputs.name }}-${{ inputs.kernel-tag }}-${{ github.run_id }}
@@ -239,14 +239,14 @@ runs:
 
     - name: Save kernel SHA for subsequent jobs
       if: steps.sha-cache-restore.outputs.cache-hit != 'true' && steps.kernel-sha.outputs.sha != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: .vng-sha-${{ inputs.name }}
         key: vng-sha-${{ inputs.name }}-${{ inputs.kernel-tag }}-${{ github.run_id }}
 
     - name: Restore kernel build cache
       if: steps.kernel-sha.outputs.sha != ''
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       id: kernel-cache
       with:
         path: linux
@@ -255,7 +255,7 @@ runs:
     - name: Fallback to most recent cached kernel
       if: steps.kernel-sha.outputs.remote_failed == 'true'
       id: stale-cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: linux
         key: vng-kernel-${{ inputs.name }}-${{ runner.arch }}-impossible-key-to-force-prefix-match
@@ -274,7 +274,7 @@ runs:
 
     - name: Restore ccache
       if: steps.kernel-cache.outputs.cache-hit != 'true' && inputs.kernel-compile-cache == 'true'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       id: ccache-restore
       with:
         path: ~/.cache/ccache
@@ -298,14 +298,14 @@ runs:
 
     - name: Save kernel build cache
       if: steps.kernel-cache.outputs.cache-hit != 'true' && steps.kernel-sha.outputs.remote_failed != 'true' && steps.kernel-sha.outputs.sha != ''
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: linux
         key: vng-kernel-${{ inputs.name }}-${{ runner.arch }}-${{ steps.kernel-sha.outputs.sha }}-${{ inputs.version }}
 
     - name: Save ccache
       if: steps.kernel-cache.outputs.cache-hit != 'true' && steps.kernel-sha.outputs.remote_failed != 'true' && inputs.kernel-compile-cache == 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: ~/.cache/ccache
         key: vng-ccache-${{ runner.arch }}-${{ github.run_id }}

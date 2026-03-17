@@ -7,7 +7,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: ./
         id: vng
@@ -46,10 +46,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Restore kernel SHA from build job
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: .vng-sha-test-kernel
           key: vng-sha-test-kernel-v6.12-${{ github.run_id }}
@@ -62,7 +62,7 @@ jobs:
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
 
       - name: Verify kernel cache exists
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         id: cache-check
         with:
           path: linux
@@ -94,7 +94,7 @@ jobs:
   build-arm:
     runs-on: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: ./
         id: vng
@@ -115,7 +115,7 @@ jobs:
   build-ro-workspace:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: ./
         id: vng
@@ -137,5 +137,5 @@ jobs:
   shellcheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: shellcheck scripts/*.sh
