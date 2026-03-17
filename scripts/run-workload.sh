@@ -24,9 +24,12 @@ if [ "$(uname -m)" = "aarch64" ]; then
     VNG_QEMU_OPTS="${VNG_QEMU_OPTS## }"
 fi
 
-VNG_ARGS=(--cwd "$GITHUB_WORKSPACE" --rwdir "$GITHUB_WORKSPACE"
+VNG_ARGS=(--cwd "$GITHUB_WORKSPACE"
           --pin --cpus "$VNG_CPUS" --memory "$VNG_MEMORY"
           --disable-monitor)
+if [ "${VNG_WORKSPACE_RW:-true}" = "true" ]; then
+    VNG_ARGS+=(--rwdir "$GITHUB_WORKSPACE")
+fi
 if [ -n "${VNG_NETWORK:-}" ]; then
     VNG_ARGS+=(--network "$VNG_NETWORK")
 fi

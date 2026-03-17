@@ -83,6 +83,10 @@ inputs:
     description: 'Install recommended packages alongside dependencies (default: false)'
     required: false
     default: 'false'
+  workspace-rw:
+    description: 'Mount $GITHUB_WORKSPACE read-write in the VM (default: true)'
+    required: false
+    default: 'true'
   extra-rwdirs:
     description: 'Additional host directories to mount read-write in the VM (space-separated, tilde-expanded)'
     required: false
@@ -310,6 +314,7 @@ runs:
         VNG_NETWORK: ${{ inputs.network }}
         VNG_VERBOSE: ${{ inputs.verbose }}
         VNG_RUN_TIMEOUT: ${{ inputs.run-timeout }}
+        VNG_WORKSPACE_RW: ${{ inputs.workspace-rw }}
         VNG_EXTRA_RWDIRS: ${{ inputs.extra-rwdirs }}
         VNG_APPEND: ${{ inputs.append }}
         VNG_QEMU_OPTS: ${{ inputs.qemu-opts }}

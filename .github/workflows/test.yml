@@ -19,11 +19,17 @@ jobs:
           run: |
             uname -r
             echo "Hello from inside the VM"
+            echo "vng-summary-test" >> "$GITHUB_STEP_SUMMARY"
+            grep -q "vng-summary-test" "$GITHUB_STEP_SUMMARY"
 
       - name: Verify outputs
         run: |
           test -n "${{ steps.vng.outputs.kernel-sha }}"
           echo "kernel-sha: ${{ steps.vng.outputs.kernel-sha }}"
+
+      - name: Verify step summary written from VM
+        run: |
+          grep -q "vng-summary-test" "$GITHUB_STEP_SUMMARY" || { echo "::error::GITHUB_STEP_SUMMARY not persisted from VM"; exit 1; }
 
       - name: Verify vmlinux.h
         run: |
@@ -100,6 +106,28 @@ jobs:
         run: |
           test -n "${{ steps.vng.outputs.kernel-sha }}"
           echo "kernel-sha: ${{ steps.vng.outputs.kernel-sha }}"
+
+  build-ro-workspace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./
+        id: vng
+        with:
+          name: test-kernel
+          kernel-url: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+          kernel-tag: v6.12
+          version: build-${{ github.run_id }}
+          workspace-rw: false
+          run: |
+            uname -r
+            echo "vng-ro-summary-test" >> "$GITHUB_STEP_SUMMARY"
+            grep -q "vng-ro-summary-test" "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify step summary written from ro-workspace VM
+        run: |
+          grep -q "vng-ro-summary-test" "$GITHUB_STEP_SUMMARY" || { echo "::error::GITHUB_STEP_SUMMARY not persisted from ro-workspace VM"; exit 1; }
 
   shellcheck:
     runs-on: ubuntu-latest
