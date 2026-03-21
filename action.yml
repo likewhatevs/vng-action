@@ -208,7 +208,7 @@ runs:
         # so we always resolve to the same underlying commit SHA.
         REMOTE_OUTPUT=""
         for attempt in 1 2 3; do
-          REMOTE_OUTPUT=$(git ls-remote "${{ inputs.kernel-url }}" "${{ inputs.kernel-tag }}" "${{ inputs.kernel-tag }}^{}" 2>/dev/null || true)
+          REMOTE_OUTPUT=$(git ls-remote "${{ inputs.kernel-url }}" "refs/heads/${{ inputs.kernel-tag }}" "refs/tags/${{ inputs.kernel-tag }}" "refs/tags/${{ inputs.kernel-tag }}^{}" 2>/dev/null || true)
           if [ -n "$REMOTE_OUTPUT" ]; then
             break
           fi
