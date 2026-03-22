@@ -2,9 +2,9 @@
 set -euo pipefail
 
 PACKAGES=(
-    build-essential flex bison bc
+    build-essential flex bison bc cmake
     cpio kmod rsync
-    libelf-dev libssl-dev libzstd-dev dwarves
+    libelf-dev libssl-dev libzstd-dev libdw-dev dwarves
     binutils-dev libcap-dev llvm-dev
     virtiofsd busybox-static ccache
 )
@@ -73,6 +73,22 @@ if ! dpkg -s "${PACKAGES[@]}" &>/dev/null || [ ! -x "${PIPX_BIN}/vng" ]; then
         exit 1
     fi
     echo "$PIPX_BIN" >> "$GITHUB_PATH"
+
+    # Build pahole from source — distro versions lack KF_IMPLICIT_ARGS
+    # decl_tag support needed by resolve_btfids for _impl BTF generation
+    if ! pahole --version 2>/dev/null | grep -qE 'v1\.(3[1-9]|[4-9])'; then
+        echo "::group::Building pahole v1.31 from source"
+        git clone --depth 1 --branch v1.31 \
+            https://git.kernel.org/pub/scm/devel/pahole/pahole.git /tmp/pahole
+        cmake -S /tmp/pahole -B /tmp/pahole/build \
+            -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -Wno-dev
+        make -C /tmp/pahole/build -j"$(nproc)" -s
+        sudo make -C /tmp/pahole/build install -s
+        sudo ldconfig
+        rm -rf /tmp/pahole
+        echo "Installed pahole $(pahole --version) at $(which pahole)"
+        echo "::endgroup::"
+    fi
 
     # On arm64, the pipx-bundled virtme-ng-init is x86_64; build native
     if [ "$(dpkg --print-architecture)" = "arm64" ]; then
